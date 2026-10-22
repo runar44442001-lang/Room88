@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ro"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rooms88</title>
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Rooms88"><meta name="theme-color" content="#d9480f">
+<script src="config.js"></script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f7f9;--c:#fff;--t:#1c2330;--m:#6b7280;--a:#d9480f;--b:#e3e6ea;--r:#dc2626}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171c;--c:#1e232b;--t:#eef0f3;--m:#98a2b3;--a:#fb923c;--b:#323a46;--r:#f87171}}
+:root[data-theme="dark"]{--bg:#14171c;--c:#1e232b;--t:#eef0f3;--m:#98a2b3;--a:#fb923c;--b:#323a46;--r:#f87171}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--t);font:16px system-ui,sans-serif}
+*{box-sizing:border-box}main{max-width:640px;margin:auto;padding:14px 14px 60px}
+h1{font-size:21px;margin:4px 0 12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.room{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:16px 12px;cursor:pointer;text-align:center}
+.room b{display:block;font-size:16px;margin-top:4px}.room .m{margin-top:6px}
+.card{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:12px;margin-bottom:10px}
+input,textarea,select,button{font:inherit;color:var(--t);background:var(--c);border:1px solid var(--b);border-radius:8px;padding:10px}
+input,textarea{width:100%}textarea{min-height:140px;resize:vertical}
+button{cursor:pointer}.p{background:var(--a);color:#fff;border-color:var(--a)}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin:10px 0}
+.tabs button{white-space:nowrap;flex:none}.tabs .on{background:var(--a);color:#fff;border-color:var(--a)}
+.row{display:flex;gap:8px;align-items:center;margin:6px 0}.row>input{flex:1;min-width:0}
+.num{width:64px!important;flex:none!important;text-align:center;padding:8px 4px}
+.item{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--b)}
+.item .n{flex:1;word-break:break-word;cursor:text}.done .n{text-decoration:line-through;color:var(--m)}
+.item input[type=checkbox]{width:22px;height:22px;flex:none}
+.m{color:var(--m);font-size:13px}.low{color:var(--r);font-weight:600}.x{padding:4px 10px;color:var(--r)}
+.u{width:auto!important;padding:8px 6px;font-size:14px}.u1{color:var(--r);font-weight:600}.u2{color:#d97706}.u3{color:#16a34a}
+.sel{width:auto!important;flex:none!important}.dash{color:var(--m);flex:none}
+.top{display:flex;justify-content:space-between;gap:8px}
+#st{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));background:var(--c);border:1px solid var(--b);border-radius:20px;padding:6px 14px;font-size:14px;color:var(--m);opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+#st.bad{color:#fff;background:var(--r);border-color:var(--r)}
+</style></head><body><main id="app"></main><div id="st"></div>
+<script>
+const DEF=[["jumanji","The Lost Treasure of Jumanji","🌴"],["seif","The Seif","🔐"],["fbi","FBI Mission","🕵️"],["sherlock","Sherlock Holmes","🔍"],["orient","Orient Express","🚂"],["pearl","The Black Pearl","🏴‍☠️"],["whatif","What if","❓"]];
+const TABS=[["resp","Responsabil camera"],["inv","Inventar"],["todo","To do"]];
+const UR=[["urgent","Urgent"],["mediu","Nu chiar urgent"],["deloc","Deloc urgent"]];
+const GEN="todo_general_view",GENL=["Semne DO NOT TOUCH + alte atenționări prezente + foi (indicii fizice)","Prindere electromagneți (să nu fie extrem de deșurubați)","Obiectele care sunt prinse în pereți/podea (să nu fie slăbite)","Vârfuri de șuruburi / cuie - acoperire în caz de pericol de tăiere / înțepare","Aspect obiecte (exemplu: undiță Jumanji, valize Seif) - de schimbat / retușat / reparat dacă este nevoie","Rezerve foi + obiecte","Funcționare puzzle-uri / electronică / buton indicii / buton urgență"];
+const REC="recomandari_global",CDN="https://www.gstatic.com/firebasejs/10.12.2/";
+let fs=null,F=null,code="",err="",adm=false,data={},cur=null,tab="resp",timer=null,pt=null,pend=0,stT=null;
+try{adm=localStorage.getItem("adm")==="1"}catch(e){}
+const $=s=>document.querySelector(s),uid=()=>"c"+Math.random().toString(36).slice(2,9);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const dflt=id=>{const d=DEF.find(x=>x[0]===id);return{resp:"",inv:[],todo:[],name:d?d[1]:"Cameră nouă",emo:d?d[2]:"🚪"}};
+const room=id=>({...dflt(id),...(data[id]||{})});
+const ids=()=>[...DEF.map(d=>d[0]),...Object.keys(data).filter(k=>!DEF.some(d=>d[0]===k)&&k!==REC).sort((a,b)=>(data[a].ts||0)-(data[b].ts||0))].filter(k=>!(data[k]&&data[k].deleted));
+const recItems=()=>((data[REC]&&data[REC].items)||[]);
+
+function st(msg,bad){const e=$("#st");if(!e)return;clearTimeout(stT);e.textContent=msg;e.className=bad?"bad":"";e.style.opacity=msg?1:0;if(msg&&!bad)stT=setTimeout(()=>{e.style.opacity=0},2000)}
+function idle(){const a=document.activeElement;if(a&&/INPUT|TEXTAREA/.test(a.tagName)&&a.type!=="checkbox")return;render()}
+addEventListener("offline",()=>st("Fără internet — nu se salvează",1));
+addEventListener("online",()=>st(""));
+
+function setCode(){const c=($("#cd").value||"").replace(/[^A-Za-z0-9_-]/g,"");if(c.length<6)return alert("Codul trebuie să aibă minim 6 litere sau cifre (fără spații).");code=c;connect();render()}
+function logout(){location.reload()}
+function adminLogin(){const c=prompt("Cod administrator:");if(c===null)return;if(window.ADMIN_CODE&&c.trim()===window.ADMIN_CODE){adm=true;try{localStorage.setItem("adm","1")}catch(e){}render()}else alert("Cod greșit.")}
+function adminOut(){adm=false;try{localStorage.removeItem("adm")}catch(e){}render()}
+
+function init(){
+  const w=new URLSearchParams(location.search).has("admin");
+  render();
+  if(w)setTimeout(()=>{history.replaceState(null,"",location.pathname);if(!adm)adminLogin()},400);
+}
+async function connect(){
+  const cfg=window.FIREBASE_CONFIG;
+  if(!cfg||!cfg.apiKey||cfg.apiKey==="PASTE"){err="Lipsește configurarea Firebase (fișierul config.js).";render();return}
+  try{
+    const [A,S]=await Promise.all([import(CDN+"firebase-app.js"),import(CDN+"firebase-firestore.js")]);
+    F=S;fs=S.getFirestore(A.initializeApp(cfg));
+    S.onSnapshot(S.collection(fs,"teams",code,"rooms"),s=>{
+      err="";data={};s.docs.forEach(d=>data[d.id]=d.data());idle();
+    },e=>{err="Nu mă pot conecta ("+(e.code||"eroare")+"). Verifică regulile Firestore și codul.";render()});
+  }catch(e){err="Nu mă pot conecta la baza de date.";render()}
+}
+// Orice modificare: citește versiunea cea mai nouă din baza de date, aplică schimbarea și salvează (nimic nu se pierde între colegi)
+async function mutate(id,fn){
+  if(!fs){alert("Nu sunt conectat la baza de date. Modificarea NU s-a salvat.");return false}
+  pend++;st("Se salvează…");
+  try{
+    let out;
+    await F.runTransaction(fs,async tx=>{
+      const ref=F.doc(fs,"teams",code,"rooms",id),snap=await tx.get(ref);
+      const base=id===REC?{items:[]}:dflt(id);
+      const c=JSON.parse(JSON.stringify({...base,...(snap.exists()?snap.data():{})}));
+      fn(c);tx.set(ref,c);out=c;
+    });
+    data[id]=out;pend--;if(!pend)st("Salvat ✓");idle();return true;
+  }catch(e){pend--;st("Nu s-a salvat!",1);alert("Modificarea NU s-a salvat ("+(e.code||"eroare")+"). Verifică internetul și încearcă din nou.");return false}
+}
+const M=fn=>mutate(cur,fn);
+function autoSave(){pt={id:cur,v:$("#tx").value};clearTimeout(timer);st("Se scrie…");timer=setTimeout(flush,600)}
+function flush(){clearTimeout(timer);if(!pt)return;const{id,v}=pt;pt=null;mutate(id,r=>{r.resp=v})}
+addEventListener("pagehide",flush);document.addEventListener("visibilitychange",()=>{if(document.hidden)flush()});
+
+function addRoom(){if(!adm)return;const n=(prompt("Numele camerei noi:")||"").trim();if(!n)return;mutate(uid(),r=>{r.name=n;r.ts=Date.now()})}
+function renameRoom(){if(!adm)return;const n=(prompt("Nume nou:",room(cur).name)||"").trim();if(!n)return;M(r=>{r.name=n})}
+function delRoom(){if(!adm)return;if(!confirm("Ștergi camera și tot ce conține?"))return;const id=cur;cur=null;mutate(id,r=>{r.deleted=true}).then(render)}
+function addTodo(){const t=$("#nt").value.trim();if(!t)return;M(r=>{r.todo.push({id:uid(),t,done:false})})}
+function addInv(){const t=$("#nt").value.trim();if(!t)return;const q=+$("#nq").value||0,u=$("#nu").value;M(r=>{r.inv.push({id:uid(),t,q,u})})}
+function upd(k,id,f){M(r=>{const it=(r[k]||[]).find(i=>i.id===id);if(it)f(it)})}
+function edit(k,id){const it=(room(cur)[k]||[]).find(i=>i.id===id);if(!it)return;const t=(prompt("Modifică:",it.t)||"").trim();if(t)upd(k,id,x=>{x.t=t})}
+function rm(k,id){M(r=>{r[k]=(r[k]||[]).filter(i=>i.id!==id)})}
+function clearDone(){M(r=>{r.todo=r.todo.filter(i=>!i.done)})}
+function addRec(){const t=$("#rt").value.trim();if(!t)return;const c=$("#rc").value,d=new Date().toLocaleDateString("ro-RO");mutate(REC,r=>{r.items.push({id:uid(),t,cat:c,d})})}
+function rmRec(id){mutate(REC,r=>{r.items=r.items.filter(i=>i.id!==id)})}
+function editRec(id){const x=recItems().find(i=>i.id===id);if(!x)return;const t=(prompt("Modifică:",x.t)||"").trim();if(t)mutate(REC,r=>{const y=r.items.find(i=>i.id===id);if(y)y.t=t})}
+
+function genView(note){
+  return `<button onclick="cur=null;render()">← Toate camerele</button><h1>📋 To Do General</h1>${note}
+  <div class="card"><b>Verificare:</b>${GENL.map(t=>`<div class="item"><span class="dash">–</span><div class="n">${esc(t)}</div></div>`).join("")}</div>
+  <p class="m">Listă valabilă pentru toate camerele (doar vizualizare).</p>`;
+}
+function recView(note){
+  const it=recItems();
+  const grp=(c,l)=>{const L=it.filter(i=>i.cat===c);return `<div class="card"><b>${l}</b> <span class="m">(${L.length})</span>${L.map(i=>`<div class="item"><span class="dash">–</span><div class="n" onclick="editRec('${i.id}')">${esc(i.t)}<div class="m">${esc(i.d||"")}</div></div><button class="x" onclick="rmRec('${i.id}')">✕</button></div>`).join("")||'<p class="m">Nimic încă.</p>'}</div>`};
+  return `<button onclick="cur=null;render()">← Toate camerele</button><h1>💡 Recomandări</h1>${note}
+  <div class="card"><textarea id="rt" style="min-height:90px" placeholder="Scrie aici..."></textarea>
+  <div class="row"><select id="rc" class="sel u" style="font-size:16px"><option value="idee">Idee</option><option value="plangere">Plângere constantă</option></select><button class="p" style="flex:1" onclick="addRec()">+ Adaugă</button></div></div>
+  ${grp("idee","Idei")}${grp("plangere","Plângeri constante")}<p class="m">Atinge un text ca să-l modifici.</p>`;
+}
+function render(){
+  const a=$("#app"),note=err?`<p class="low m">⚠️ ${esc(err)}</p>`:"";
+  if(!code){a.innerHTML=`<h1>🚪 Rooms88</h1><p style="font-size:20px;font-weight:600;margin:14px 0">Heei, hai să muncim puțin!</p><div class="card"><p class="m">Introdu codul echipei:</p><input id="cd" placeholder="Cod echipă" autocapitalize="off" autocomplete="off" onkeydown="event.key==='Enter'&&setCode()"><button class="p" style="width:100%;margin-top:8px" onclick="setCode()">Intră</button></div>`;return}
+  if(cur===REC){a.innerHTML=recView(note);return}
+  if(cur===GEN){a.innerHTML=genView(note);return}
+  if(!cur){
+    const ri=recItems();
+    a.innerHTML=`<h1>🚪 Rooms88</h1>${note}<div class="room" style="margin-bottom:10px" onclick="cur=GEN;render()"><div style="font-size:26px">📋</div><b>To Do General</b><div class="m">${GENL.length} puncte de verificare · pentru toate camerele</div></div><div class="room" style="margin-bottom:10px" onclick="cur=REC;render()"><div style="font-size:26px">💡</div><b>Recomandări</b><div class="m">${ri.filter(i=>i.cat==="idee").length} idei · ${ri.filter(i=>i.cat==="plangere").length} plângeri constante</div></div><div class="grid">${ids().map(id=>{
+      const r=room(id),urg=r.inv.filter(i=>i.u==="urgent").length,td=r.todo.filter(i=>!i.done).length;
+      return `<div class="room" onclick="cur='${id}';tab='resp';render()"><div style="font-size:30px">${r.emo}</div><b>${esc(r.name)}</b>
+      <div class="m">${r.resp?esc(r.resp):"fără responsabil"}</div><div class="m">${td} de făcut${urg?` · <span class="low">${urg} urgente</span>`:""}</div></div>`}).join("")}</div>
+      ${adm?'<button class="p" style="width:100%;margin-top:12px" onclick="addRoom()">+ Adaugă cameră</button><p style="text-align:center"><a href="#" class="m" onclick="logout();return false">Schimbă codul echipei</a> · <a href="#" class="m" onclick="adminOut();return false">Ieși din modul administrator</a></p>':""}`;
+    return;
+  }
+  const r=room(cur);let body="";
+  if(tab==="resp")body=`<p class="m">Angajatul responsabil de această cameră:</p><input id="tx" value="${esc(r.resp)}" placeholder="Nume responsabil" oninput="autoSave()" onblur="flush();setTimeout(idle,80)"><p class="m">Se salvează automat.</p>`;
+  else if(tab==="todo")body=`<div class="row"><input id="nt" placeholder="Ce trebuie făcut?" onkeydown="event.key==='Enter'&&addTodo()"><button class="p" onclick="addTodo()">+</button></div>
+    ${r.todo.map(i=>`<div class="item ${i.done?"done":""}"><span class="dash">–</span><input type="checkbox" ${i.done?"checked":""} onchange="upd('todo','${i.id}',x=>{x.done=!x.done})"><div class="n" onclick="edit('todo','${i.id}')">${esc(i.t)}</div><button class="x" onclick="rm('todo','${i.id}')">✕</button></div>`).join("")||'<p class="m">Nimic de făcut 🎉</p>'}
+    ${r.todo.some(i=>i.done)?'<button onclick="clearDone()" style="width:100%;margin-top:8px">Șterge cele bifate</button>':""}<p class="m">Atinge un text ca să-l modifici.</p>`;
+  else body=`<div class="row"><input id="nt" placeholder="Obiect"><input id="nq" class="num" type="number" placeholder="Cant."></div>
+    <div class="row"><select id="nu" class="u sel">${UR.map(([k,l])=>`<option value="${k}" ${k==="deloc"?"selected":""}>${l}</option>`).join("")}</select><button class="p" onclick="addInv()" style="flex:1">+ Adaugă în inventar</button></div>
+    ${r.inv.map(i=>`<div class="item" style="flex-wrap:wrap"><div class="n" onclick="edit('inv','${i.id}')">${esc(i.t)}</div><button class="x" onclick="rm('inv','${i.id}')">✕</button>
+    <div class="row" style="width:100%;margin:0"><button onclick="upd('inv','${i.id}',x=>{x.q=Math.max(0,(+x.q||0)-1)})">−</button><input class="num" type="number" value="${i.q}" onchange="upd('inv','${i.id}',x=>{x.q=+this.value||0})"><button onclick="upd('inv','${i.id}',x=>{x.q=(+x.q||0)+1})">+</button>
+    <select class="u u${UR.findIndex(z=>z[0]===(i.u||"deloc"))+1}" onchange="upd('inv','${i.id}',x=>{x.u=this.value})">${UR.map(([k,l])=>`<option value="${k}" ${k===(i.u||"deloc")?"selected":""}>${l}</option>`).join("")}</select></div></div>`).join("")}
+    <p class="m">Atinge numele ca să-l modifici.</p>`;
+  a.innerHTML=`<div class="top"><button onclick="flush();cur=null;render()">← Toate camerele</button>${adm?'<span><button onclick="renameRoom()">✏️ Nume</button> <button class="x" onclick="delRoom()">🗑</button></span>':""}</div><h1>${r.emo} ${esc(r.name)}</h1>${note}
+  <div class="tabs">${TABS.map(([k,l])=>`<button class="${tab===k?"on":""}" onclick="flush();tab='${k}';render()">${l}</button>`).join("")}</div><div class="card">${body}</div>`;
+}
+init();
+</script></body></html>
